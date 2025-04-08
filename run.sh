@@ -1,0 +1,1 @@
+python src/main_incremental.py --approach lwf --nepochs 200 --batch-size 128 --num-workers 4 --datasets fmnist --num-tasks 5 --nc-first-task 2 --lr 0.05 --weight-decay 5e-4 --clipping 1  --network bbbresnet18  --momentum 0.9 --exp-name exp1 --seed 0
