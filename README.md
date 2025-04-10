@@ -37,18 +37,6 @@ Contains custom layer implementations, which are especially useful in probabilis
   - Variational inference layers
   - Custom dropout or uncertainty-aware modules
 - Useful for modeling uncertainty and improving robustness over time.
-
----
-
-### `loggers/`
-Logging utilities for tracking training progress and evaluation results.
-
-- Supports:
-  - TensorBoard logging
-  - CSV or JSON export for metrics
-  - Custom in-memory or live plotting loggers
-- Helpful for monitoring continual performance, forgetting, and generalization.
-
 ---
 
 ### `networks/`
@@ -57,7 +45,7 @@ Implements the backbone neural network architectures used in continual learning.
 - Includes:
   - **Bayesian ResNet-18**
   - **Bayesian ResNet-32**
-  - **Bae=yesian LeNet**
+  - **Baeyesian LeNet**
 - These models are usually adapted to support dynamic output heads and continual task expansion.
 
 ---
