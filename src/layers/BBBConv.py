@@ -24,9 +24,9 @@ class BBBConv2d(ModuleWrapper):
         if priors is None:
             priors = {
                 'prior_mu': 0,
-                'prior_sigma': 0.001,
-                'posterior_mu_initial': (0, 0.001),
-                'posterior_rho_initial': (-3, 0.001),
+                'prior_sigma': 0.1,
+                'posterior_mu_initial': (0, 0),
+                'posterior_rho_initial': (-3, 0.1),
             }
         self.prior_mu = priors['prior_mu']
         self.prior_sigma = priors['prior_sigma']
@@ -95,7 +95,7 @@ class BBBConv2D(nn.Module):
         if priors is None:
             priors = {
                 'prior_mu': 0,
-                'prior_sigma': 0.0001,
+                'prior_sigma': 1,
             }
         self.prior_W_mu = priors['prior_mu']
         self.prior_W_sigma = priors['prior_sigma']

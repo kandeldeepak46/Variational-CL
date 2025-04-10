@@ -5,6 +5,7 @@ from .vggnet import VggNet
 from .resnet32 import resnet32
 
 from .bbbresnet18 import bbbresnet18
+from .bbbresnet32 import bbbresnet32
 
 
 # available torchvision models
@@ -20,7 +21,7 @@ tvmodels = ['alexnet',
             'wide_resnet50_2', 'wide_resnet101_2'
             ]
 
-allmodels = tvmodels + ['resnet32', 'resnet20', 'LeNet', 'VggNet', 'BayesianLeNet', 'bbbresnet18']
+allmodels = tvmodels + ['resnet32', 'resnet20', 'LeNet', 'VggNet', 'BayesianLeNet', 'bbbresnet18', 'bbbresnet32']
 
 
 def set_tvmodel_head_var(model):

@@ -14,14 +14,45 @@ class Appr(Inc_Learning_Appr):
     # Weight decay of 0.0005 is used in the original article (page 4).
     # Page 4: "The warm-up step greatly enhances fine-tuning’s old-task performance, but is not so crucial to either our
     #  method or the compared Less Forgetting Learning (see Table 2(b))."
-    def __init__(self, model, device, nepochs=100, lr=0.05, lr_min=1e-4, lr_factor=3, lr_patience=5, clipgrad=10000,
-                 momentum=0, wd=0, multi_softmax=False, wu_nepochs=0, wu_lr_factor=1, fix_bn=False, eval_on_train=False,
-                 logger=None, exemplars_dataset=None, lamb=1, T=2):
-        super(Appr, self).__init__(model, device, nepochs, lr, lr_min, lr_factor, lr_patience, clipgrad, momentum, wd,
-                                   multi_softmax, wu_nepochs, wu_lr_factor, fix_bn, eval_on_train, logger,
+    def __init__(self, 
+                 model, 
+                 device, 
+                 nepochs=100, 
+                 lr=0.05, 
+                 lr_min=1e-4, 
+                 lr_factor=3, 
+                 lr_patience=5, 
+                 clipgrad=10000,
+                 momentum=0, 
+                 wd=0, multi_softmax=False, 
+                 wu_nepochs=0, 
+                 wu_lr_factor=1, 
+                 fix_bn=False, 
+                 eval_on_train=False,
+                 logger=None, 
+                 exemplars_dataset=None, 
+                 lamb=1, 
+                 T=2
+        ):
+        super(Appr, self).__init__(model, 
+                                   device, 
+                                   nepochs, 
+                                   lr, lr_min, 
+                                   lr_factor, 
+                                   lr_patience, 
+                                   clipgrad, 
+                                   momentum, 
+                                   wd,
+                                   multi_softmax, 
+                                   wu_nepochs, 
+                                   wu_lr_factor, 
+                                   fix_bn, 
+                                   eval_on_train, 
+                                   logger,
                                    exemplars_dataset)
         self.model_old = None
         self.lamb = lamb
+        self.kl_weight = 1e-4
         self.T = T
 
     @staticmethod
@@ -91,14 +122,10 @@ class Appr(Inc_Learning_Appr):
             features_old = None
             if t > 0:
                 outputs_old, features_old = self.model_old(images, return_features=True)
-            
             outputs, features = self.model(images, return_features=True)
-            
             loss = self.rcriterion(t, outputs, targets, outputs_old, features, features_old)
-            
-            # kl = self.model.KL()
-            # loss = loss + (kl * 0.0000001)  # Adjust scaling factor as needed
-            
+            kl = self.model.KL()
+            loss = loss + self.kl_weight * kl
             # Backward pass and optimization
             self.optimizer.zero_grad()
             loss.backward()

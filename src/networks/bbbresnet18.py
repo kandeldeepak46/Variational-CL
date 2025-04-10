@@ -317,7 +317,7 @@ class ResNet(nn.Module):
     def get_kl_loss(self):
         kl_loss = 0
         for module in self.modules():
-            if isinstance(module, BBBConv2d):
+            if isinstance(module, BBBConv2D):
                 kl_loss += module.kl_loss()
             for module in self.modules():
                 if isinstance(module, BBBLinear):
