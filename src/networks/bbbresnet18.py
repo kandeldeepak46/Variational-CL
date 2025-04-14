@@ -235,7 +235,7 @@ class ResNet(nn.Module):
                              "or a 3-element tuple, got {}".format(replace_stride_with_dilation))
         self.groups = groups
         self.base_width = width_per_group
-        self.conv1 = BBBConv2D(1, self.inplanes, kernel_size=7, stride=2, padding=3,
+        self.conv1 = BBBConv2D(3, self.inplanes, kernel_size=7, stride=2, padding=3,
                                bias=False)
         self.bn1 = norm_layer(self.inplanes)
         self.relu = nn.ReLU(inplace=True)
@@ -249,7 +249,7 @@ class ResNet(nn.Module):
                                        dilate=replace_stride_with_dilation[2])
         self.bottleneck = BBBConv2D(512, num_features, 1, stride=1)
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        # self.fc = nn.Linear(num_features, num_classes)
+        # self.fc = BBBLinear(num_features, num_classes)
         self.fc = nn.Linear(num_features, num_classes)
         self.head_var = 'fc'
 

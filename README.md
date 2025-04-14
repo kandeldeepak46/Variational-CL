@@ -6,50 +6,6 @@ This repository contains a modular framework for Continual Learning (CL) researc
 
 Each directory in the `src/` folder is designed with a specific responsibility in the CL pipeline:
 
-### `approaches/`
-Implements different continual learning strategies and algorithms.
-
-- Contains methods such as:
-  - **EWC** (Elastic Weight Consolidation)
-  - **LwF** (Learning without Forgetting)
-- Each approach typically includes logic for loss calculation, knowledge retention, and backward transfer control.
-
----
-
-### `datasets/`
-Contains dataset loaders and utilities tailored for continual learning scenarios.
-
-- Supports various CL benchmarks like:
-  - Split MNIST
-  - Split FMNIST
-  - Split CIFAR10
-  - Split CIFAR-100
-  - Permuted MNIST
-- Handles incremental task splitting, normalization, and data loading across tasks.
-
----
-
-### `layers/`
-Contains custom layer implementations, which are especially useful in probabilistic or Bayesian continual learning.
-
-- Includes:
-  - Bayesian linear layers
-  - Variational inference layers
-  - Custom dropout or uncertainty-aware modules
-- Useful for modeling uncertainty and improving robustness over time.
----
-
-### `networks/`
-Implements the backbone neural network architectures used in continual learning.
-
-- Includes:
-  - **Bayesian ResNet-18**
-  - **Bayesian ResNet-32**
-  - **Baeyesian LeNet**
-- These models are usually adapted to support dynamic output heads and continual task expansion.
-
----
-
 ## 🔧 Getting Started
 
 ### 1. Install Dependencies
