@@ -1,4 +1,4 @@
-# Continual Learning Framework
+# Exempler-Free Variational Continual Learning
 
 This repository contains a modular framework for Continual Learning (CL) research. It is structured to enable easy experimentation with various CL approaches, datasets, network architectures, and logging strategies.
 
