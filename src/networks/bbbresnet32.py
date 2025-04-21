@@ -86,19 +86,18 @@ class Bottleneck(nn.Module):
 
 
 class ResNet(nn.Module):
-
     def __init__(self, block, layers, num_classes=10, num_features=64):
         self.inplanes = 16
         super(ResNet, self).__init__()
-        self.conv1_starting = BBBConv2D(3, 16, kernel_size=3, stride=1, padding=1, bias=False)
+        self.conv1_starting = BBBConv2D(1, 16, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn1_starting = nn.BatchNorm2d(16)
         self.relu = nn.ReLU(inplace=True)
         self.layer1 = self._make_layer(block, 16, layers[0])
         self.layer2 = self._make_layer(block, 32, layers[1], stride=2)
         self.layer3 = self._make_layer(NoReLUBasicBlock, 64, layers[2], stride=2)
         # last classifier layer (head) with as many outputs as classes
-        self.fc = nn.Linear(64 * block.expansion, num_classes)
-        # self.fc = BBBLinear(64 * block.expansion, num_classes)
+        # self.fc = nn.Linear(64 * block.expansion, num_classes)
+        self.fc = BBBLinear(64 * block.expansion, num_classes)
         # and `head_var` with the name of the head, so it can be removed when doing incremental learning experiments
         self.head_var = 'fc'
 

@@ -120,10 +120,6 @@ def main(argv=None):
     else:
         print('WARNING: [CUDA unavailable] Using CPU instead!')
         device = 'cpu'
-    # Multiple gpus
-    # if torch.cuda.device_count() > 1:
-    #     self.C = torch.nn.DataParallel(C)
-    #     self.C.to(self.device)
     ####################################################################################################################
 
     # Args -- Network
@@ -135,9 +131,8 @@ def main(argv=None):
         else:
             init_model = tvnet(pretrained=args.pretrained)
         set_tvmodel_head_var(init_model)
-    else:  # other models declared in networks package's init
+    else:
         net = getattr(importlib.import_module(name='networks'), args.network)
-        # WARNING: fixed to pretrained False for other model (non-torchvision)
         init_model = net(pretrained=False)
 
     # Args -- Continual Learning Approach

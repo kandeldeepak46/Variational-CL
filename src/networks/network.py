@@ -2,6 +2,43 @@
 import torch
 from torch import nn
 from copy import deepcopy
+import torch.nn.functional as F
+
+from layers import BBBLinear
+
+class ELBO(nn.Module):
+    def __init__(self, kl_weight=1.0):
+        """
+        Initialize the ELBO loss class.
+
+        Args:
+            kl_weight (float): Weight for the KL divergence term.
+        """
+        super(ELBO, self).__init__()
+        self.kl_weight = kl_weight
+
+    def forward(self, logits, aux_targets, kl_divergence):
+        """
+        Compute the ELBO loss.
+
+        Args:
+            logits (torch.Tensor): Logits output from the model.
+            aux_targets (torch.Tensor): Auxiliary targets for the NLL loss.
+            kl_divergence (torch.Tensor): KL divergence term from the model.
+
+        Returns:
+            torch.Tensor: The computed ELBO loss.
+        """
+        # Compute the negative log-likelihood loss
+        nll_loss = F.nll_loss(F.log_softmax(logits, dim=1), aux_targets)
+
+        # Combine NLL loss and KL divergence
+        elbo_loss = nll_loss + self.kl_weight * kl_divergence
+
+        return elbo_loss
+    
+        return ce + self.beta * kl
+    
 
 
 class LLL_Net(nn.Module):
@@ -12,7 +49,7 @@ class LLL_Net(nn.Module):
         assert type(head_var) == str
         assert not remove_existing_head or hasattr(model, head_var), \
             "Given model does not have a variable called {}".format(head_var)
-        assert not remove_existing_head or type(getattr(model, head_var)) in [nn.Sequential, nn.Linear], \
+        assert not remove_existing_head or type(getattr(model, head_var)) in [nn.Sequential, nn.Linear, BBBLinear], \
             "Given model's head {} does is not an instance of nn.Sequential or nn.Linear".format(head_var)
         super(LLL_Net, self).__init__()
 
@@ -20,18 +57,20 @@ class LLL_Net(nn.Module):
         last_layer = getattr(self.model, head_var)
 
         if remove_existing_head:
-            if type(last_layer) == nn.Sequential:
+            if isinstance(last_layer, nn.Sequential):
                 self.out_size = last_layer[-1].in_features
-                # strips off last linear layer of classifier
                 del last_layer[-1]
-            elif type(last_layer) == nn.Linear:
+            elif isinstance(last_layer, nn.Linear):
                 self.out_size = last_layer.in_features
-                # converts last layer into identity
-                # setattr(self.model, head_var, nn.Identity())
-                # WARNING: this is for when pytorch version is <1.2
                 setattr(self.model, head_var, nn.Sequential())
-        else:
-            self.out_size = last_layer.out_features
+            elif isinstance(last_layer, BBBLinear):  # <-- ADD THIS
+                self.out_size = last_layer.in_features
+                setattr(self.model, head_var, nn.Sequential())
+            else:
+                raise TypeError(
+                    f"Given model's head {head_var} is not an instance of "
+                    f"nn.Sequential, nn.Linear, or BBBLinear"
+                )
 
         self.heads = nn.ModuleList()
         self.task_cls = []
@@ -42,8 +81,7 @@ class LLL_Net(nn.Module):
         """Add a new head with the corresponding number of outputs. Also update the number of classes per task and the
         corresponding offsets
         """
-        self.heads.append(nn.Linear(self.out_size, num_outputs))
-        # we re-compute instead of append in case an approach makes changes to the heads
+        self.heads.append(BBBLinear(self.out_size, num_outputs))
         self.task_cls = torch.tensor([head.out_features for head in self.heads])
         self.task_offset = torch.cat([torch.LongTensor(1).zero_(), self.task_cls.cumsum(0)[:-1]])
 
@@ -96,9 +134,12 @@ class LLL_Net(nn.Module):
         pass
 
     def KL(self):
-        """KL divergence for the model"""
+        """Compute the total KL divergence from all Bayesian layers."""
         kl = 0
         for module in self.model.modules():
             if hasattr(module, 'kl_loss'):
                 kl += module.kl_loss()
+        for head in self.heads:
+            if hasattr(head, 'kl_loss'):
+                kl += head.kl_loss()
         return kl

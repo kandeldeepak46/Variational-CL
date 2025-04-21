@@ -3,3 +3,8 @@
 *.pyo
 *.pyd
 *.egg-info
+*.eggs
+*.whl
+*.DS_Store
+*.vs_code
+*.vscode

@@ -1,9 +1,44 @@
 import torch
+from torch import nn
+import torch.nn.functional as F
 from copy import deepcopy
 from argparse import ArgumentParser
 
 from .incremental_learning import Inc_Learning_Appr
 from datasets.exemplars_dataset import ExemplarsDataset
+
+class ELBO(nn.Module):
+    def __init__(self, kl_weight=1.0):
+        """
+        Initialize the ELBO loss class.
+
+        Args:
+            kl_weight (float): Weight for the KL divergence term.
+        """
+        super(ELBO, self).__init__()
+        self.kl_weight = kl_weight
+
+    def forward(self, logits, aux_targets, kl_divergence):
+        """
+        Compute the ELBO loss.
+
+        Args:
+            logits (torch.Tensor): Logits output from the model.
+            aux_targets (torch.Tensor): Auxiliary targets for the NLL loss.
+            kl_divergence (torch.Tensor): KL divergence term from the model.
+
+        Returns:
+            torch.Tensor: The computed ELBO loss.
+        """
+        # Compute the negative log-likelihood loss
+        nll_loss = F.nll_loss(F.log_softmax(logits, dim=1), aux_targets)
+
+        # Combine NLL loss and KL divergence
+        elbo_loss = nll_loss + self.kl_weight * kl_divergence
+
+        return elbo_loss
+    
+        return ce + self.beta * kl
 
 
 class Appr(Inc_Learning_Appr):
@@ -52,7 +87,7 @@ class Appr(Inc_Learning_Appr):
                                    exemplars_dataset)
         self.model_old = None
         self.lamb = lamb
-        self.kl_weight = 1e-4
+        self.kl_weight = 1e-5
         self.T = T
 
     @staticmethod
@@ -63,21 +98,14 @@ class Appr(Inc_Learning_Appr):
     def extra_parser(args):
         """Returns a parser containing the approach specific parameters"""
         parser = ArgumentParser()
-        # Page 5: "lambda is a loss balance weight, set to 1 for most our experiments. Making lambda larger will favor
-        # the old task performance over the new task’s, so we can obtain a old-task-new-task performance line by
-        # changing lambda."
-        parser.add_argument('--lamb', default=1, type=float, required=False,
-                            help='Forgetting-intransigence trade-off (default=%(default)s)')
-        # Page 5: "We use T=2 according to a grid search on a held out set, which aligns with the authors’
-        #  recommendations." -- Using a higher value for T produces a softer probability distribution over classes.
-        parser.add_argument('--T', default=2, type=int, required=False,
-                            help='Temperature scaling (default=%(default)s)')
+       
+        parser.add_argument('--lamb', default=1, type=float, required=False,help='Forgetting-intransigence trade-off (default=%(default)s)')
+        parser.add_argument('--T', default=2, type=int, required=False,help='Temperature scaling (default=%(default)s)')
         return parser.parse_known_args(args)
 
     def _get_optimizer(self):
         """Returns the optimizer"""
         if len(self.exemplars_dataset) == 0 and len(self.model.heads) > 1:
-            # if there are no exemplars, previous heads are not modified
             params = list(self.model.model.parameters()) + list(self.model.heads[-1].parameters())
         else:
             params = self.model.parameters()
@@ -123,9 +151,14 @@ class Appr(Inc_Learning_Appr):
             if t > 0:
                 outputs_old, features_old = self.model_old(images, return_features=True)
             outputs, features = self.model(images, return_features=True)
-            loss = self.rcriterion(t, outputs, targets, outputs_old, features, features_old)
+            
+            # loss = self.rcriterion(t, outputs, targets, outputs_old, features, features_old)
+            # loss = self.focal_loss(outputs[t], targets - self.model.task_offset[t])
+            
+            nll = self.ELBO(t, outputs, targets, outputs_old, features, features_old)
             kl = self.model.KL()
-            loss = loss + self.kl_weight * kl
+            loss = nll + self.kl_weight * kl
+            
             # Backward pass and optimization
             self.optimizer.zero_grad()
             loss.backward()
@@ -219,6 +252,51 @@ class Appr(Inc_Learning_Appr):
         else:
             # Without exemplars, use only the current task head
             loss += torch.nn.functional.cross_entropy(outputs[t], targets - self.model.task_offset[t])
+        
+        return loss
+    
+
+    def ELBO(self, t, outputs, targets, outputs_old=None, features=None, features_old=None):
+        """Returns the loss value with both logit and feature distillation.
+        
+        Args:
+            t (int): Current task index
+            outputs (list of tensors): Outputs from all heads of the current model
+            targets (tensor): Ground truth labels
+            outputs_old (list of tensors, optional): Outputs from all heads of the old model (for logit distillation)
+            features (tensor, optional): Features from the current model (before the heads)
+            features_old (tensor, optional): Features from the old model (for feature distillation)
+        """
+        loss = 0
+        
+        # Hyperparameters for balancing the losses
+        lamb_logit = self.lamb  # Weight for logit distillation (from your original code)
+        lamb_feature = 1.0      # Weight for feature distillation (tune this as needed)
+        T = self.T              # Temperature for logit distillation
+        
+        if t > 0:
+            # Logit distillation loss for all previous tasks
+            loss += lamb_logit * self.cross_entropy(
+                torch.cat(outputs[:t], dim=1), 
+                torch.cat(outputs_old[:t], dim=1), 
+                exp=1.0 / T
+            )
+            
+            # Feature distillation loss (e.g., MSE between current and old features)
+            if features is not None and features_old is not None:
+                loss += lamb_feature * torch.nn.functional.mse_loss(features, features_old)
+        
+        # Current task NLL loss
+        if len(self.exemplars_dataset) > 0:
+            # With exemplars, use all heads
+            loss += torch.nn.functional.nll_loss(
+                torch.log_softmax(torch.cat(outputs, dim=1), dim=1), targets
+            )
+        else:
+            # Without exemplars, use only the current task head
+            loss += torch.nn.functional.nll_loss(
+                torch.log_softmax(outputs[t], dim=1), targets - self.model.task_offset[t]
+            )
         
         return loss
     

@@ -162,8 +162,14 @@ def get_perm(trn_data, tst_data, num_tasks, validation=0.0, seed=42):
         if validation > 0.0:
             val_size = int(validation * len(trn_data['y']))
             val_indices = np.random.choice(len(trn_data['y']), val_size, replace=False)
+            
+            # Ensure data is a NumPy array for advanced indexing
+            data[tt]['trn']['x'] = np.array(data[tt]['trn']['x'])
+            data[tt]['trn']['y'] = np.array(data[tt]['trn']['y'])
+            
             data[tt]['val']['x'] = data[tt]['trn']['x'][val_indices]
             data[tt]['val']['y'] = data[tt]['trn']['y'][val_indices]
+            
             mask = np.ones(len(trn_data['y']), dtype=bool)
             mask[val_indices] = False
             data[tt]['trn']['x'] = data[tt]['trn']['x'][mask]
