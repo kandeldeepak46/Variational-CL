@@ -1,5 +1,6 @@
 import time
 import torch
+import torch.nn.functional as F
 import numpy as np
 from argparse import ArgumentParser
 
@@ -168,6 +169,79 @@ class Inc_Learning_Appr:
                 total_acc_tag += hits_tag.sum().item()
                 total_num += len(targets)
         return total_loss / total_num, total_acc_taw / total_num, total_acc_tag / total_num
+
+ 
+
+    def eval_proto(self, t, val_loader):
+        """Evaluation using Mahalanobis Distance"""
+        with torch.no_grad():
+            self.model.eval()
+            features_by_class = {}
+            total_loss, total_acc, total_num = 0, 0, 0
+
+            # First pass: collect features to compute class prototypes and covariance
+            for images, targets in val_loader:
+                images = images.to(self.device)
+                targets = targets.to(self.device)
+                features = self.model(images)
+                print(f"Features shape: {features.shape}")
+                print(f"Targets shape: {targets.shape}")
+                exit()
+                for feat, label in zip(features, targets):
+                    label = label.item()
+                    if label not in features_by_class:
+                        features_by_class[label] = []
+                    features_by_class[label].append(feat)
+
+            # Compute class prototypes and shared covariance
+            all_features = []
+            prototypes = {}
+            for cls, feats in features_by_class.items():
+                feats_tensor = torch.stack(feats)
+                proto = feats_tensor.mean(dim=0)
+                prototypes[cls] = proto
+                all_features.append(feats_tensor)
+
+            all_features = torch.cat(all_features)
+            overall_mean = all_features.mean(dim=0)
+            centered = all_features - overall_mean
+
+            # Shared covariance matrix with regularization
+            cov = centered.T @ centered / (len(all_features) - 1)
+            cov += 1e-6 * torch.eye(cov.size(0), device=self.device)
+            inv_cov = torch.linalg.inv(cov)
+
+            # Second pass: evaluate Mahalanobis distance
+            for images, targets in val_loader:
+                images = images.to(self.device)
+                targets = targets.to(self.device)
+                features = self.model(images)
+
+                # Compute Mahalanobis distances to all prototypes
+                dists = []
+                for proto_cls in prototypes:
+                    proto = prototypes[proto_cls]
+                    diff = features - proto  # [batch_size, feature_dim]
+                    dist = torch.sqrt((diff @ inv_cov * diff).sum(dim=1))  # Mahalanobis distance
+                    dists.append(dist.unsqueeze(1))  # [batch_size, 1]
+
+                dists = torch.cat(dists, dim=1)  # [batch_size, num_classes]
+                log_probs = F.log_softmax(-dists, dim=1)
+
+                # Match targets to correct class index
+                class_to_idx = {cls: i for i, cls in enumerate(prototypes)}
+                mapped_targets = torch.tensor([class_to_idx[t.item()] for t in targets], device=self.device)
+
+                loss = F.nll_loss(log_probs, mapped_targets)
+                preds = log_probs.argmax(dim=1)
+                acc = (preds == mapped_targets).float().sum()
+
+                total_loss += loss.item() * len(targets)
+                total_acc += acc.item()
+                total_num += len(targets)
+
+            return total_loss / total_num, total_acc / total_num
+
 
     def calculate_metrics(self, outputs, targets):
         """Contains the main Task-Aware and Task-Agnostic metrics"""

@@ -151,13 +151,13 @@ class Appr(Inc_Learning_Appr):
             if t > 0:
                 outputs_old, features_old = self.model_old(images, return_features=True)
             outputs, features = self.model(images, return_features=True)
-            
-            # loss = self.rcriterion(t, outputs, targets, outputs_old, features, features_old)
+            # loss = self.criterion(t, outputs, targets, outputs_old) 
+            loss = self.rcriterion(t, outputs, targets, outputs_old, features, features_old)
             # loss = self.focal_loss(outputs[t], targets - self.model.task_offset[t])
-            
-            nll = self.ELBO(t, outputs, targets, outputs_old, features, features_old)
+            # loss = self.ELBO(t, outputs, targets, outputs_old, features, features_old)
+            # loss  = self.focal_loss(t, outputs, targets)
             kl = self.model.KL()
-            loss = nll + self.kl_weight * kl
+            loss = loss + self.kl_weight * kl
             
             # Backward pass and optimization
             self.optimizer.zero_grad()
@@ -185,7 +185,103 @@ class Appr(Inc_Learning_Appr):
                 total_acc_tag += hits_tag.sum().data.cpu().numpy().item()
                 total_num += len(targets)
         return total_loss / total_num, total_acc_taw / total_num, total_acc_tag / total_num
+    
 
+    def eval_proto(self, t, val_loader):
+        """Evaluation using Mahalanobis Distance (task-aware and task-agnostic)"""
+        with torch.no_grad():
+            self.model.eval()
+            features_by_class = {}
+            total_loss, total_acc_taw, total_acc_tag, total_num = 0, 0, 0, 0
+
+            # First pass: collect features for prototypes
+            for images, targets in val_loader:
+                images = images.to(self.device)
+                targets = targets.to(self.device)
+                _, features = self.model(images, return_features=True)
+                for feat, label in zip(features, targets):
+                    label = label.item()
+                    if label not in features_by_class:
+                        features_by_class[label] = []
+                    features_by_class[label].append(feat)
+
+            # Compute class prototypes and shared covariance
+            all_features = []
+            prototypes = {}
+            for cls, feats in features_by_class.items():
+                feats_tensor = torch.stack(feats)
+                proto = feats_tensor.mean(dim=0)
+                prototypes[cls] = proto
+                all_features.append(feats_tensor)
+
+            all_features = torch.cat(all_features)
+            centered = all_features - all_features.mean(dim=0)
+            cov = centered.T @ centered / (len(all_features) - 1)
+            cov += 1e-6 * torch.eye(cov.size(0), device=self.device)
+            inv_cov = torch.linalg.inv(cov)
+
+            # Class index mapping
+            all_classes = sorted(prototypes.keys())
+            class_to_idx = {cls: i for i, cls in enumerate(all_classes)}
+
+            # Second pass: evaluate distances
+            for images, targets in val_loader:
+                images = images.to(self.device)
+                targets = targets.to(self.device)
+
+                targets_old = None
+                if t > 0:
+                    targets_old = self.model_old(images.to(self.device))
+
+                _, features = self.model(images, return_features=True)
+
+                # Compute Mahalanobis distances to all prototypes
+                dists = []
+                for cls in all_classes:
+                    proto = prototypes[cls]
+                    diff = features - proto
+                    dist = torch.sqrt((diff @ inv_cov * diff).sum(dim=1))
+                    dists.append(dist.unsqueeze(1))
+
+                dists = torch.cat(dists, dim=1)  # [batch_size, num_classes]
+                log_probs = F.log_softmax(-dists, dim=1)  # negative because closer = better
+
+                # Map target labels to indices in prototypes
+                mapped_targets = torch.tensor([class_to_idx[y.item()] for y in targets], device=self.device)
+
+                # Loss (just basic NLL here, no extra args)
+                loss = F.nll_loss(log_probs, mapped_targets)
+
+                # Prediction
+                preds = log_probs.argmax(dim=1)
+
+                # Task-Aware accuracy
+                classes_per_task = 10  # Adjust if needed
+                raw_task_class_indices = list(range(t * classes_per_task, (t + 1) * classes_per_task))
+                task_class_indices = [class_to_idx[c] for c in raw_task_class_indices if c in class_to_idx]
+
+                task_dists = dists[:, task_class_indices]
+                task_preds = task_dists.argmin(dim=1)
+                task_true = torch.tensor([
+                    task_class_indices.index(class_to_idx[y.item()])
+                    for y in targets
+                ], device=self.device)
+
+                hits_taw = (task_preds == task_true).float()
+                hits_tag = (preds == mapped_targets).float()
+
+                # Logging
+                total_loss += loss.item() * len(targets)
+                total_acc_taw += hits_taw.sum().item()
+                total_acc_tag += hits_tag.sum().item()
+                total_num += len(targets)
+
+            return total_loss / total_num, total_acc_taw / total_num, total_acc_tag / total_num
+
+
+  
+        
+        
     def cross_entropy(self, outputs, targets, exp=1.0, size_average=True, eps=1e-5):
         """Calculates cross-entropy with temperature scaling"""
         out = torch.nn.functional.softmax(outputs, dim=1)
@@ -301,9 +397,9 @@ class Appr(Inc_Learning_Appr):
         return loss
     
 
-    def focal_loss(self, outputs, targets, alpha=0.25, gamma=2.0):
+    def focal_loss(self, t, outputs, targets, alpha=0.25, gamma=2.0):
         """Focal loss implementation"""
-        BCE_loss = torch.nn.functional.cross_entropy(outputs, targets)
+        BCE_loss = torch.nn.functional.cross_entropy(outputs[t], targets - self.model.task_offset[t])
         pt = torch.exp(-BCE_loss)
         F_loss = alpha * (1 - pt) ** gamma * BCE_loss
         return F_loss
