@@ -165,28 +165,6 @@ class Appr(Inc_Learning_Appr):
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.clipgrad)
             self.optimizer.step()
         
-    def eval(self, t, val_loader):
-        """Contains the evaluation code"""
-        with torch.no_grad():
-            total_loss, total_acc_taw, total_acc_tag, total_num = 0, 0, 0, 0
-            self.model.eval()
-            for images, targets in val_loader:
-                # Forward old model
-                targets_old = None
-                if t > 0:
-                    targets_old = self.model_old(images.to(self.device))
-                # Forward current model
-                outputs = self.model(images.to(self.device))
-                loss = self.criterion(t, outputs, targets.to(self.device), targets_old)
-                hits_taw, hits_tag = self.calculate_metrics(outputs, targets)
-                # Log
-                total_loss += loss.data.cpu().numpy().item() * len(targets)
-                total_acc_taw += hits_taw.sum().data.cpu().numpy().item()
-                total_acc_tag += hits_tag.sum().data.cpu().numpy().item()
-                total_num += len(targets)
-        return total_loss / total_num, total_acc_taw / total_num, total_acc_tag / total_num
-    
-
     def eval_proto(self, t, val_loader):
         """Evaluation using Mahalanobis Distance (task-aware and task-agnostic)"""
         with torch.no_grad():
@@ -256,7 +234,7 @@ class Appr(Inc_Learning_Appr):
                 preds = log_probs.argmax(dim=1)
 
                 # Task-Aware accuracy
-                classes_per_task = 10  # Adjust if needed
+                classes_per_task = self.model.task_cls[t]
                 raw_task_class_indices = list(range(t * classes_per_task, (t + 1) * classes_per_task))
                 task_class_indices = [class_to_idx[c] for c in raw_task_class_indices if c in class_to_idx]
 
@@ -279,6 +257,26 @@ class Appr(Inc_Learning_Appr):
             return total_loss / total_num, total_acc_taw / total_num, total_acc_tag / total_num
 
 
+    def eval(self, t, val_loader):
+        """Contains the evaluation code"""
+        with torch.no_grad():
+            total_loss, total_acc_taw, total_acc_tag, total_num = 0, 0, 0, 0
+            self.model.eval()
+            for images, targets in val_loader:
+                # Forward old model
+                targets_old = None
+                if t > 0:
+                    targets_old = self.model_old(images.to(self.device))
+                # Forward current model
+                outputs = self.model(images.to(self.device))
+                loss = self.criterion(t, outputs, targets.to(self.device), targets_old)
+                hits_taw, hits_tag = self.calculate_metrics(outputs, targets)
+                # Log
+                total_loss += loss.data.cpu().numpy().item() * len(targets)
+                total_acc_taw += hits_taw.sum().data.cpu().numpy().item()
+                total_acc_tag += hits_tag.sum().data.cpu().numpy().item()
+                total_num += len(targets)
+        return total_loss / total_num, total_acc_taw / total_num, total_acc_tag / total_num
   
         
         

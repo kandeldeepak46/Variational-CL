@@ -89,7 +89,7 @@ class ResNet(nn.Module):
     def __init__(self, block, layers, num_classes=10, num_features=64):
         self.inplanes = 16
         super(ResNet, self).__init__()
-        self.conv1_starting = BBBConv2D(1, 16, kernel_size=3, stride=1, padding=1, bias=False)
+        self.conv1_starting = BBBConv2D(3, 16, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn1_starting = nn.BatchNorm2d(16)
         self.relu = nn.ReLU(inplace=True)
         self.layer1 = self._make_layer(block, 16, layers[0])

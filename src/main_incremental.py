@@ -193,7 +193,7 @@ def main(argv=None):
 
     # Network and Approach instances
     utils.seed_everything(seed=args.seed)
-    net = LLL_Net(init_model, remove_existing_head=not args.keep_existing_head)
+    net = LLL_Net(init_model, taskcla, remove_existing_head=not args.keep_existing_head)
     utils.seed_everything(seed=args.seed)
     # taking transformations and class indices from first train dataset
     first_train_ds = trn_loader[0].dataset
