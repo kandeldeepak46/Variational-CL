@@ -24,7 +24,7 @@ sh run.sh
 ```
 ### 📦 Datasets
 
-To experiment with datasets like TinyImageNet, you can download it from the following source:
+To experiment with datasets like TinyImageNet, you can download it from the following source and put in in ../data directory:
 
 - [TinyImageNet-200 on Kaggle](https://www.kaggle.com/datasets/nikhilshingadiya/tinyimagenet200)
 
