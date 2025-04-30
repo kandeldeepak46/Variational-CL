@@ -22,6 +22,11 @@ Alternatively,
 ```bash
 sh run.sh
 ```
+### 📦 Datasets
+
+To experiment with datasets like TinyImageNet, you can download it from the following source:
+
+- [TinyImageNet-200 on Kaggle](https://www.kaggle.com/datasets/nikhilshingadiya/tinyimagenet200)
 
 > ### 🙏 Acknowledgements
 > This repository is **heavily inspired by and builds upon** the following open-source projects:
