@@ -261,7 +261,7 @@ def main(argv=None):
 
         # Test
         for u in range(t + 1):
-            test_loss, acc_taw[t, u], acc_tag[t, u] = appr.eval_proto(u, tst_loader[u])
+            test_loss, acc_taw[t, u], acc_tag[t, u] = appr.eval(u, tst_loader[u])
             if u < t:
                 forg_taw[t, u] = acc_taw[:t, u].max(0) - acc_taw[t, u]
                 forg_tag[t, u] = acc_tag[:t, u].max(0) - acc_tag[t, u]
