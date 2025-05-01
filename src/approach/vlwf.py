@@ -38,7 +38,6 @@ class ELBO(nn.Module):
 
         return elbo_loss
     
-        return ce + self.beta * kl
 
 
 class Appr(Inc_Learning_Appr):
@@ -152,9 +151,9 @@ class Appr(Inc_Learning_Appr):
                 outputs_old, features_old = self.model_old(images, return_features=True)
             outputs, features = self.model(images, return_features=True)
             # loss = self.criterion(t, outputs, targets, outputs_old) 
-            loss = self.rcriterion(t, outputs, targets, outputs_old, features, features_old)
+            # loss = self.rcriterion(t, outputs, targets, outputs_old, features, features_old)
             # loss = self.focal_loss(outputs[t], targets - self.model.task_offset[t])
-            # loss = self.ELBO(t, outputs, targets, outputs_old, features, features_old)
+            loss = self.ELBO(t, outputs, targets, outputs_old, features, features_old)
             # loss  = self.focal_loss(t, outputs, targets)
             kl = self.model.KL()
             loss = loss + self.kl_weight * kl
